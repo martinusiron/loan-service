@@ -1,0 +1,5 @@
+#docker
+db_url: "postgres://postgres:postgres@db:5432/loan_db?sslmode=disable"
+
+#local
+# db_url: "postgres://postgres:postgres@localhost:5432/loan_db?sslmode=disable"

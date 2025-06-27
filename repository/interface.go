@@ -2,7 +2,8 @@ package repository
 
 import (
 	"context"
-	"github/Amartha-Loan-Service/domain"
+
+	"github.com/martinusiron/loan-service/domain"
 )
 
 type LoanRepository interface {
