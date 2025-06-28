@@ -10,7 +10,10 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "contact": {
+            "name": "Martinus Iron Sijabat",
+            "email": "your@email.com"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -35,7 +38,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/delivery_http.CreateLoanPayload"
+                            "$ref": "#/definitions/dto.CreateLoanPayload"
                         }
                     }
                 ],
@@ -127,12 +130,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Approval payload",
+                        "description": "Approval payload (date format: YYYY-MM-DD)",
                         "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/delivery_http.ApproveLoanPayload"
+                            "$ref": "#/definitions/dto.ApproveLoanPayload"
                         }
                     }
                 ],
@@ -179,12 +182,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Disbursement payload",
+                        "description": "Disbursement payload (date format: YYYY-MM-DD)",
                         "name": "payload",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/delivery_http.DisburseLoanPayload"
+                            "$ref": "#/definitions/dto.DisburseLoanPayload"
                         }
                     }
                 ],
@@ -236,7 +239,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/delivery_http.InvestLoanPayload"
+                            "$ref": "#/definitions/dto.InvestLoanPayload"
                         }
                     }
                 ],
@@ -264,8 +267,13 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "delivery_http.ApproveLoanPayload": {
+        "dto.ApproveLoanPayload": {
             "type": "object",
+            "required": [
+                "date",
+                "employee_id",
+                "picture_proof"
+            ],
             "properties": {
                 "date": {
                     "type": "string"
@@ -278,8 +286,14 @@ const docTemplate = `{
                 }
             }
         },
-        "delivery_http.CreateLoanPayload": {
+        "dto.CreateLoanPayload": {
             "type": "object",
+            "required": [
+                "borrower_id",
+                "principal_amount",
+                "rate",
+                "roi"
+            ],
             "properties": {
                 "borrower_id": {
                     "type": "string"
@@ -291,12 +305,18 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "roi": {
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0
                 }
             }
         },
-        "delivery_http.DisburseLoanPayload": {
+        "dto.DisburseLoanPayload": {
             "type": "object",
+            "required": [
+                "agreement_letter_link",
+                "date",
+                "employee_id"
+            ],
             "properties": {
                 "agreement_letter_link": {
                     "type": "string"
@@ -309,8 +329,12 @@ const docTemplate = `{
                 }
             }
         },
-        "delivery_http.InvestLoanPayload": {
+        "dto.InvestLoanPayload": {
             "type": "object",
+            "required": [
+                "amount",
+                "investor_email"
+            ],
             "properties": {
                 "amount": {
                     "type": "number"
@@ -325,12 +349,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "",
-	BasePath:         "",
+	Version:          "1.0",
+	Host:             "localhost:8080",
+	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Amartha Loan Service API",
+	Description:      "RESTful API to simulate loan lifecycle (proposed → approved → invested → disbursed).",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 }

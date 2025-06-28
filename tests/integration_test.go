@@ -39,7 +39,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	approvalRepo := postgres.NewApprovalRepo(s.DB)
 	investmentRepo := postgres.NewInvestmentRepo(s.DB)
 
-	uc := usecase.NewLoanUsecase(loanRepo, approvalRepo, investmentRepo)
+	uc := usecase.NewLoanUsecase(loanRepo, approvalRepo, investmentRepo, db)
 
 	r := gin.Default()
 	http.NewHandler(r, uc)

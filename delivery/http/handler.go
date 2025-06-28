@@ -1,11 +1,13 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/martinusiron/loan-service/dto"
 	"github.com/martinusiron/loan-service/usecase"
 
 	"github.com/gin-gonic/gin"
@@ -28,50 +30,35 @@ func NewHandler(r *gin.Engine, uc *usecase.LoanUsecase) {
 	}
 }
 
-type CreateLoanPayload struct {
-	BorrowerID      string  `json:"borrower_id"`
-	PrincipalAmount float64 `json:"principal_amount"`
-	Rate            float64 `json:"rate"`
-	ROI             float64 `json:"roi"`
-}
-
-type ApproveLoanPayload struct {
-	PictureProof string `json:"picture_proof"`
-	EmployeeID   string `json:"employee_id"`
-	Date         string `json:"date"`
-}
-
-type InvestLoanPayload struct {
-	InvestorEmail string  `json:"investor_email"`
-	Amount        float64 `json:"amount"`
-}
-
-type DisburseLoanPayload struct {
-	AgreementLink string `json:"agreement_letter_link"`
-	EmployeeID    string `json:"employee_id"`
-	Date          string `json:"date"`
+func errorResponse(c *gin.Context, status int, err error) {
+	c.JSON(status, gin.H{"error": err.Error()})
 }
 
 // @Summary Create a new loan
 // @Tags Loans
 // @Accept json
 // @Produce json
-// @Param payload body CreateLoanPayload true "Loan payload"
+// @Param payload body dto.CreateLoanPayload true "Loan payload"
 // @Success 201 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /v1/loans [post]
 func (h *Handler) CreateLoan(c *gin.Context) {
-	var payload CreateLoanPayload
+	var payload dto.CreateLoanPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	loan, err := h.UC.CreateLoan(c.Request.Context(), payload.BorrowerID, payload.PrincipalAmount, payload.Rate, payload.ROI)
+
+	loan, err := h.UC.CreateLoan(
+		c.Request.Context(),
+		payload,
+	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
+
 	c.JSON(http.StatusCreated, loan)
 }
 
@@ -80,23 +67,37 @@ func (h *Handler) CreateLoan(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Loan ID"
-// @Param payload body ApproveLoanPayload true "Approval payload"
+// @Param payload body dto.ApproveLoanPayload true "Approval payload (date format: YYYY-MM-DD)"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Router /v1/loans/{id}/approve [post]
 func (h *Handler) ApproveLoan(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	var payload ApproveLoanPayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	parsedDate, _ := time.Parse("2006-01-02", payload.Date)
-	err := h.UC.ApproveLoan(c, id, payload.PictureProof, payload.EmployeeID, parsedDate)
+	var payload dto.ApproveLoanPayload
+
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
+
+	payload.LoanID = id
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		errorResponse(c, http.StatusBadRequest, err)
+		return
+	}
+
+	parsedDate, err := time.Parse("2006-01-02", payload.DateStr)
+	if err != nil {
+		errorResponse(c, http.StatusBadRequest, fmt.Errorf("invalid date format, must be YYYY-MM-DD"))
+		return
+	}
+	payload.Date = parsedDate
+
+	if err := h.UC.ApproveLoan(c, payload); err != nil {
+		errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Loan approved"})
 }
 
@@ -105,22 +106,32 @@ func (h *Handler) ApproveLoan(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Loan ID"
-// @Param payload body InvestLoanPayload true "Investment payload"
+// @Param payload body dto.InvestLoanPayload true "Investment payload"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Router /v1/loans/{id}/invest [post]
 func (h *Handler) InvestLoan(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	var payload InvestLoanPayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	err := h.UC.InvestLoan(c, id, payload.InvestorEmail, payload.Amount)
+	var payload dto.InvestLoanPayload
+
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
+
+	payload.LoanID = id
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		errorResponse(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.UC.InvestLoan(c,
+		payload,
+	); err != nil {
+		errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Investment accepted"})
 }
 
@@ -129,23 +140,40 @@ func (h *Handler) InvestLoan(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Loan ID"
-// @Param payload body DisburseLoanPayload true "Disbursement payload"
+// @Param payload body dto.DisburseLoanPayload true "Disbursement payload (date format: YYYY-MM-DD)"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Router /v1/loans/{id}/disburse [post]
 func (h *Handler) DisburseLoan(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	var payload DisburseLoanPayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	parsedDate, _ := time.Parse("2006-01-02", payload.Date)
-	err := h.UC.DisburseLoan(c, id, payload.AgreementLink, payload.EmployeeID, parsedDate)
+	var payload dto.DisburseLoanPayload
+
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
+
+	payload.LoanID = id
+
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		errorResponse(c, http.StatusBadRequest, err)
+		return
+	}
+
+	parsedDate, err := time.Parse("2006-01-02", payload.DateStr)
+	if err != nil {
+		errorResponse(c, http.StatusBadRequest, fmt.Errorf("invalid date format, must be YYYY-MM-DD"))
+		return
+	}
+	payload.Date = parsedDate
+
+	if err := h.UC.DisburseLoan(c,
+		payload,
+	); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Loan disbursed"})
 }
 
@@ -158,16 +186,21 @@ func (h *Handler) DisburseLoan(c *gin.Context) {
 // @Router /v1/loans/{id} [get]
 func (h *Handler) GetLoan(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
-	fmt.Println("id handler ", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error parsing id"})
+		errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
 
 	loan, err := h.UC.GetLoan(c, id)
-	if err != nil || loan == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "loan not found"})
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
+
+	if loan == nil {
+		errorResponse(c, http.StatusNotFound, errors.New("loan not found"))
+		return
+	}
+
 	c.JSON(http.StatusOK, loan)
 }

@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/martinusiron/loan-service/domain"
+	"github.com/martinusiron/loan-service/dto"
 
 	mockRepo "github.com/martinusiron/loan-service/mocks"
 
@@ -17,12 +19,19 @@ func TestCreateLoan(t *testing.T) {
 	mockLoanRepo := new(mockRepo.LoanRepository)
 	mockApprovalRepo := new(mockRepo.ApprovalRepository)
 	mockInvestRepo := new(mockRepo.InvestmentRepository)
+	db := &sql.DB{}
 
-	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo)
+	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo, db)
 
 	mockLoanRepo.On("CreateLoan", mock.Anything, mock.AnythingOfType("*domain.Loan")).Return(nil)
 
-	loan, err := uc.CreateLoan(context.TODO(), "BR123", 1000000, 10.0, 5.0)
+	payload := dto.CreateLoanPayload{
+		BorrowerID:      "BR123",
+		PrincipalAmount: 1000000,
+		Rate:            10.0,
+		ROI:             5.0,
+	}
+	loan, err := uc.CreateLoan(context.TODO(), payload)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "BR123", loan.BorrowerID)
@@ -33,8 +42,9 @@ func TestApproveLoan(t *testing.T) {
 	mockLoanRepo := new(mockRepo.LoanRepository)
 	mockApprovalRepo := new(mockRepo.ApprovalRepository)
 	mockInvestRepo := new(mockRepo.InvestmentRepository)
+	db := &sql.DB{}
 
-	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo)
+	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo, db)
 
 	loan := &domain.Loan{
 		ID:         1,
@@ -45,7 +55,13 @@ func TestApproveLoan(t *testing.T) {
 	mockApprovalRepo.On("CreateApproval", mock.Anything, mock.AnythingOfType("*domain.LoanApproval")).Return(nil)
 	mockLoanRepo.On("UpdateLoanStatus", mock.Anything, 1, domain.StatusApproved).Return(nil)
 
-	err := uc.ApproveLoan(context.TODO(), 1, "proof.jpg", "EMP001", time.Now())
+	payload := dto.ApproveLoanPayload{
+		LoanID:       1,
+		PictureProof: "proof.jpg",
+		EmployeeID:   "EMP001",
+		Date:         time.Now(),
+	}
+	err := uc.ApproveLoan(context.TODO(), payload)
 	assert.NoError(t, err)
 }
 
@@ -53,8 +69,9 @@ func TestInvestLoan_Full(t *testing.T) {
 	mockLoanRepo := new(mockRepo.LoanRepository)
 	mockApprovalRepo := new(mockRepo.ApprovalRepository)
 	mockInvestRepo := new(mockRepo.InvestmentRepository)
+	db := &sql.DB{}
 
-	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo)
+	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo, db)
 
 	loan := &domain.Loan{
 		ID:              1,
@@ -71,7 +88,12 @@ func TestInvestLoan_Full(t *testing.T) {
 		{InvestorEmail: "b@b.com", Amount: 500000},
 	}, nil)
 
-	err := uc.InvestLoan(context.TODO(), 1, "new@investor.com", 100000)
+	payload := dto.InvestLoanPayload{
+		LoanID:        1,
+		InvestorEmail: "new@investor.com",
+		Amount:        100000,
+	}
+	err := uc.InvestLoan(context.TODO(), payload)
 	assert.NoError(t, err)
 }
 
@@ -79,8 +101,9 @@ func TestDisburseLoan(t *testing.T) {
 	mockLoanRepo := new(mockRepo.LoanRepository)
 	mockApprovalRepo := new(mockRepo.ApprovalRepository)
 	mockInvestRepo := new(mockRepo.InvestmentRepository)
+	db := &sql.DB{}
 
-	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo)
+	uc := NewLoanUsecase(mockLoanRepo, mockApprovalRepo, mockInvestRepo, db)
 
 	loan := &domain.Loan{
 		ID:     1,
@@ -90,6 +113,12 @@ func TestDisburseLoan(t *testing.T) {
 	mockLoanRepo.On("SetAgreementLink", mock.Anything, 1, "http://link.com/file.pdf").Return(nil)
 	mockLoanRepo.On("UpdateLoanStatus", mock.Anything, 1, domain.StatusDisbursed).Return(nil)
 
-	err := uc.DisburseLoan(context.TODO(), 1, "http://link.com/file.pdf", "EMP02", time.Now())
+	payload := dto.DisburseLoanPayload{
+		LoanID:        1,
+		AgreementLink: "http://link.com/file.pdf",
+		EmployeeID:    "EMP02",
+		Date:          time.Now(),
+	}
+	err := uc.DisburseLoan(context.TODO(), payload)
 	assert.NoError(t, err)
 }

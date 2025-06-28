@@ -6,36 +6,45 @@ import (
 	"os"
 
 	"github.com/martinusiron/loan-service/configs"
+	"github.com/martinusiron/loan-service/delivery/http"
 	"github.com/martinusiron/loan-service/repository/postgres"
 	"github.com/martinusiron/loan-service/usecase"
 
-	httpDelivery "github.com/martinusiron/loan-service/delivery/http"
-
 	_ "github.com/lib/pq"
+	_ "github.com/martinusiron/loan-service/docs" // Swagger docs
 )
 
+// @title Amartha Loan Service API
+// @version 1.0
+// @description RESTful API to simulate loan lifecycle (proposed → approved → invested → disbursed).
+// @contact.name Martinus Iron Sijabat
+// @contact.email your@email.com
+// @host localhost:8080
+// @BasePath /
 func main() {
 	cfg := configs.Load()
 
-	connStr := cfg.DB_URL
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open("postgres", cfg.DB_URL)
 	if err != nil {
-		log.Fatal("failed to connect to db:", err)
+		log.Fatalf("failed to connect to DB: %v", err)
 	}
 	defer db.Close()
 
 	loanRepo := postgres.NewLoanRepo(db)
 	approvalRepo := postgres.NewApprovalRepo(db)
 	investRepo := postgres.NewInvestmentRepo(db)
-	usecase := usecase.NewLoanUsecase(loanRepo, approvalRepo, investRepo)
 
-	router := httpDelivery.InitRouter(&httpDelivery.Handler{UC: usecase})
+	uc := usecase.NewLoanUsecase(loanRepo, approvalRepo, investRepo, db)
+
+	router := http.InitRouter(uc)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Println("Starting server on port", port)
+	log.Printf("🚀 Starting server on port %s...\n", port)
+
 	if err := router.Run(":" + port); err != nil {
-		log.Fatal(err)
+		log.Fatal("server failed:", err)
 	}
 }

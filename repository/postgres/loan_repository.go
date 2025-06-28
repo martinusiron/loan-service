@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/martinusiron/loan-service/domain"
+	"github.com/martinusiron/loan-service/utils"
 )
 
 type LoanRepo struct {
@@ -18,14 +19,16 @@ func NewLoanRepo(db *sql.DB) *LoanRepo {
 }
 
 func (r *LoanRepo) CreateLoan(ctx context.Context, loan *domain.Loan) error {
+	exec := utils.GetExecutor(ctx, r.DB)
 	query := `INSERT INTO loans (borrower_id, principal_amount, rate, roi) VALUES ($1, $2, $3, $4) RETURNING id`
-	return r.DB.QueryRowContext(ctx, query,
+	return exec.QueryRowContext(ctx, query,
 		loan.BorrowerID, loan.PrincipalAmount, loan.Rate, loan.ROI).Scan(&loan.ID)
 }
 
 func (r *LoanRepo) GetLoanByID(ctx context.Context, id int) (*domain.Loan, error) {
+	exec := utils.GetExecutor(ctx, r.DB)
 	query := `SELECT id, borrower_id, principal_amount, rate, roi, status, COALESCE(agreement_letter_link, '') AS agreement_letter_link, created_at, updated_at FROM loans WHERE id = $1`
-	row := r.DB.QueryRowContext(ctx, query, id)
+	row := exec.QueryRowContext(ctx, query, id)
 
 	var l domain.Loan
 	err := row.Scan(
@@ -50,11 +53,13 @@ func (r *LoanRepo) GetLoanByID(ctx context.Context, id int) (*domain.Loan, error
 }
 
 func (r *LoanRepo) UpdateLoanStatus(ctx context.Context, id int, status domain.LoanStatus) error {
-	_, err := r.DB.ExecContext(ctx, `UPDATE loans SET status = $1, updated_at = NOW() WHERE id = $2`, status, id)
+	exec := utils.GetExecutor(ctx, r.DB)
+	_, err := exec.ExecContext(ctx, `UPDATE loans SET status = $1, updated_at = NOW() WHERE id = $2`, status, id)
 	return err
 }
 
 func (r *LoanRepo) SetAgreementLink(ctx context.Context, id int, link string) error {
-	_, err := r.DB.ExecContext(ctx, `UPDATE loans SET agreement_letter_link = $1, updated_at = NOW() WHERE id = $2`, link, id)
+	exec := utils.GetExecutor(ctx, r.DB)
+	_, err := exec.ExecContext(ctx, `UPDATE loans SET agreement_letter_link = $1, updated_at = NOW() WHERE id = $2`, link, id)
 	return err
 }
